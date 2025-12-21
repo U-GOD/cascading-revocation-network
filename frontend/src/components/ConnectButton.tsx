@@ -1,15 +1,16 @@
-"use client";
-
 import { useConnect } from "wagmi";
 import Button from "@/components/Button";
-import { metaMask } from "wagmi/connectors";
 
 export default function ConnectButton() {
-    const { connect } = useConnect();
+  const { connect, connectors } = useConnect();
 
-    return (
-        <Button className="w-full space-x-2" onClick={() => connect({ connector: metaMask() })}>
-            <span>Connect with MetaMask</span>
+  return (
+    <div className="flex gap-2">
+      {connectors.map((connector) => (
+        <Button onClick={() => connect({ connector })} key={connector.id}>
+          Connect with {connector.name}
         </Button>
-    );
+      ))}
+    </div>
+  );
 }

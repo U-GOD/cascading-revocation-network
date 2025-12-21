@@ -1,11 +1,10 @@
-# MetaMask Advanced Permissions (ERC-7715) Starter
+# MetaMask Smart Accounts Template
 
-This is a NextJS MetaMask Advanced Permissions (ERC-7715) starter created with [@metamask/create-gator-app](https://www.npmjs.com/package/@metamask/create-gator-app).
+This is a React MetaMask Smart Accounts template created with [`@metamask/create-gator-app`](https://npmjs.com/package/@metamask/create-gator-app).
 
-This template is meant to help you bootstrap your own projects with [Advanced Permissions (ERC-7715)](https://docs.metamask.io/smart-accounts-kit/guides/advanced-permissions/execute-on-metamask-users-behalf/). It helps you build 
-a dApp with ERC-7715 support to request permissions and redeem them.
+This template is meant to help you bootstrap your own projects with Metamask Smart Acounts. It helps you build smart accounts with account abstraction, and powerful delegation features.
 
-Learn more about [ERC-7715](https://eips.ethereum.org/EIPS/eip-7715).
+Learn more about [Metamask Smart Accounts](https://docs.metamask.io/smart-accounts-kit/concepts/smart-accounts/).
 
 ## Prerequisites
 
@@ -13,10 +12,9 @@ Learn more about [ERC-7715](https://eips.ethereum.org/EIPS/eip-7715).
 bundler and paymaster services to submit user operations and 
 sponsor transactions. You can get your API key from [Pimlico’s dashboard](https://dashboard.pimlico.io/apikeys).
 
-
-2. **RPC URL** In this template, you’ll need an RPC URL for the Sepolia chain. You can use a public 
-RPC or any provider of your choice, but we recommend using a paid RPC for better reliability and to 
-avoid rate-limiting issues.
+2. **Web3Auth Client ID**: During setup, if you used the 
+`-add-web3auth` flag, you’ll need to create a new project on the 
+Web3Auth Dashboard and get your Client ID. You can follow the [Web3Auth documentation](https://web3auth.io/docs/dashboard-setup#getting-started).
 
 ## Project structure
 
@@ -24,31 +22,16 @@ avoid rate-limiting issues.
 template/
 ├── public/ # Static assets
 ├── src/
-│ ├── app/ # App router pages
+│ ├── App.tsx # Main App component
+│ ├── main.tsx # Entry point
+│ ├── index.css # Global styles
 │ ├── components/ # UI Components
-│ │ ├── Button.tsx # Reusable button component
-│ │ ├── ConnectButton.tsx # Component for connecting wallet
-│ │ ├── CreateSessionAccount.tsx # Component for creating a session account
-│ │ ├── Footer.tsx # Footer component
-│ │ ├── GrantPermissionsButton.tsx # Component for granting permissions
-│ │ ├── Hero.tsx # Hero section component
-│ │ ├── PermissionInfo.tsx # Component for displaying permission information
-│ │ ├── RedeemPermissionButton.tsx # Component for redeeming permissions
-│ │ ├── Steps.tsx # Step-by-step guide component
-│ │ ├── WalletInfo.tsx # Component for displaying wallet information
-│ │ └── WalletInfoContainer.tsx # Container component for wallet information
-│ ├── providers/ # React Context Providers
-│ │ ├── AppProvider.tsx # Main app provider
-│ │ ├── PermissionProvider.tsx # Provider for permission state
-│ │ └── SessionAccountProvider.tsx # Provider for session account state
-│ ├── services/ # Service layer for API interactions
-│ │ ├── bundlerClient.ts # Bundler client configuration
-│ │ └── pimlicoClient.ts # Pimlico client configuration
-├── interfaces.d.ts # TypeScript interface definitions
+│ ├── hooks/ # Custom React hooks
+│ ├── providers/ # Custom React Context Provider
+│ └── utils/ # Utils for the starter
 ├── .env # Environment variables
 ├── .gitignore # Git ignore rules
-├── postcss.config.mjs # PostCSS configuration
-├── tailwind.config.ts # Tailwind CSS configuration
+├── vite.config.ts # Vite configuration
 └── tsconfig.json # TypeScript configuration
 ```
 
@@ -58,13 +41,21 @@ Update the following environment variables in the `.env` file at
 the root of your project.
 
 ```
-NEXT_PUBLIC_PIMLICO_API_KEY =
-NEXT_PUBLIC_RPC_URL = 
+VITE_PIMLICO_API_KEY =
+
+# Enter your Web3Auth Client ID if you 
+# used the --add-web3auth flag.
+VITE_WEB3AUTH_CLIENT_ID =
+
+# The Web3Auth network is configured based 
+# on the network option you selected during setup.
+VITE_WEB3AUTH_NETWORK =
 ```
 
 ## Getting started
 
-First, start the development server using the package manager you chose during setup.
+First, start the development server using the package manager 
+you chose during setup.
 
 ```bash
 npm run dev
@@ -74,20 +65,11 @@ yarn dev
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to view the app.
+Open [http://localhost:5173](http://localhost:5173) in your browser to view the app.
 
+## Learn more
 
-## Application Flow
+To learn more about MetaMask Smart Accounts, take a look at the following resources:
 
-This template demonstrates a complete Advanced Permissions (ERC-7715) flow:
-
-1. **Create Session Account**: Users can create a session account that will be used to redeem permissions.
-2. **Grant Permissions**: Users can grant Advanced Permissions to the session account.
-3. **Redeem Permissions**: The session account can use the granted permissions to perform actions on behalf of the MetaMask user.
-
-## Learn More
-
-To learn more about Smart Accounts Kit, take a look at the following resources:
-
-- [Advanced Permissions (ERC-7715) guide](https://docs.metamask.io/smart-accounts-kit/guides/advanced-permissions/execute-on-metamask-users-behalf/) - Learn how to use ERC-7715 permissions.
-- [Smart Accounts Kit Documentation](https://docs.metamask.io/smart-accounts-kit/) - Learn more about Smart Accounts Kit features and API.
+- [MetaMask Smart Accounts Quickstart](https://docs.metamask.io/smart-accounts-kit/get-started/smart-account-quickstart/) - Get started quickly with the MetaMask Smart Accounts
+- [Delegation guide](https://docs.metamask.io/smart-accounts-kit/guides/delegation/execute-on-smart-accounts-behalf/) - Get started quickly with creating a MetaMask smart account and completing the delegation lifecycle (creating, signing, and redeeming a delegation).
