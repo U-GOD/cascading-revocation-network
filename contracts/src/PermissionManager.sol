@@ -95,4 +95,72 @@ contract PermissionManager {
         agentRegistry = AgentRegistry(_agentRegistry);
         nextPermissionId = 1; 
     }
+
+    // ========================================================================
+    // QUERY FUNCTIONS
+    // ========================================================================
+    
+    function getMasterAgent(address owner) external view returns (MasterAgentRecord memory) {
+        return masterAgents[owner];
+    }
+    
+    function hasMasterAgent(address owner) external view returns (bool) {
+        return masterAgents[owner].active;
+    }
+    
+    function getPermission(uint256 permissionId) external view returns (PermissionNode memory) {
+        return permissions[permissionId];
+    }
+    
+    function getPermissionsByChild(address child) external view returns (uint256[] memory) {
+        return permissionsByChild[child];
+    }
+
+    function getPermissionsByMaster(address master) external view returns (uint256[] memory) {
+        return permissionsByMaster[master];
+    }
+    
+    function isPermissionValid(uint256 permissionId) public view returns (bool) {
+        PermissionNode storage perm = permissions[permissionId];
+        
+        if (perm.permissionId == 0) return false;
+        
+        if (!perm.active) return false;
+        
+        if (block.timestamp > perm.expiry) return false;
+        
+        return true;
+    }
+    
+    /**
+     * @notice Check if a child has a specific permission for a target and function
+     * @param child The child agent address
+     * @param target The target contract address
+     * @param selector The function selector to check
+     * @return True if child has valid permission for this action
+     */
+    function hasPermission(
+        address child,
+        address target,
+        bytes4 selector
+    ) external view returns (bool) {
+        uint256[] storage childPerms = permissionsByChild[child];
+        
+        for (uint256 i = 0; i < childPerms.length; i++) {
+            uint256 permId = childPerms[i];
+            PermissionNode storage perm = permissions[permId];
+
+            if (perm.targetContract != target) continue;
+
+            if (!isPermissionValid(permId)) continue;
+            
+            for (uint256 j = 0; j < perm.allowedSelectors.length; j++) {
+                if (perm.allowedSelectors[j] == selector) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
 }
