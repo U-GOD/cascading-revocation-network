@@ -41,6 +41,55 @@ contract PermissionManager {
     mapping(address => uint256[]) public permissionsByChild;
     
     mapping(address => uint256[]) public permissionsByMaster;
+  
+    event MasterAgentSet(
+        address indexed owner, 
+        address indexed masterAgent
+    );
+    
+    event MasterAgentRevoked(
+        address indexed owner, 
+        address indexed masterAgent
+    );
+    
+    event PermissionGranted(
+        uint256 indexed permissionId,
+        address indexed masterAgent,
+        address indexed childAgent,
+        address targetContract
+    );
+    
+    event PermissionRevoked(
+        uint256 indexed permissionId, 
+        address indexed revokedBy
+    );
+    
+    event AllPermissionsRevoked(
+        address indexed masterAgent, 
+        uint256 count
+    );
+    
+    error MasterAlreadySet(address owner, address existingMaster);
+    
+    error MasterNotSet(address owner);
+    
+    error NotMasterAgent(address caller, address expectedMaster);
+    
+    error PermissionNotFound(uint256 permissionId);
+    
+    error PermissionExpired(uint256 permissionId, uint256 expiry);
+    
+    error PermissionNotActive(uint256 permissionId);
+    
+    error NotAuthorizedToRevoke(address caller, uint256 permissionId);
+    
+    error InvalidTargetContract(address target);
+    
+    error NoSelectorsProvided();
+    
+    error AgentNotRegistered(address agent);
+    
+    error NotChildAgent(address agent);
     
     constructor(address _agentRegistry) {
         agentRegistry = AgentRegistry(_agentRegistry);
