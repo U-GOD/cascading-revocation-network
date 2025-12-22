@@ -38,6 +38,7 @@ contract AgentRegistryTest is Test {
      * @dev Helper to register a master agent (reduces repetition in tests)
      */
     function _registerMaster() internal {
+        bytes32 caps = registry.MASTER_DEFAULT_CAPS();
         vm.prank(user); 
         registry.registerMasterAgent(
             masterAgent,
@@ -48,5 +49,46 @@ contract AgentRegistryTest is Test {
     
     function test_SetUp_DeploysRegistry() public view {
         assertEq(registry.getAgentCount(), 0, "Should start with 0 agents");
+    }
+
+    /**
+     * @dev Test that registering a master agent works correctly
+     *      This tests the "happy path" - everything goes right
+     */
+    function test_RegisterMasterAgent_Success() public {
+        bytes32 capabilities = registry.MASTER_DEFAULT_CAPS();
+        string memory metadata = "My Master Agent";
+        
+        vm.prank(user);  
+        registry.registerMasterAgent(masterAgent, capabilities, metadata);
+        
+        assertTrue(registry.isRegistered(masterAgent), "Agent should be registered");
+        
+        assertEq(registry.getAgentCount(), 1, "Should have 1 agent");
+        
+        Agent memory agent = registry.getAgent(masterAgent);
+        assertEq(agent.agentAddress, masterAgent, "Address mismatch");
+        assertEq(uint(agent.agentType), uint(AgentType.MASTER), "Should be MASTER type");
+        assertEq(agent.capabilities, capabilities, "Capabilities mismatch");
+        assertEq(agent.registeredBy, user, "RegisteredBy should be user");
+        assertTrue(agent.isActive, "Should be active");
+    }
+    
+    /**
+     * @dev Test that registering the same agent twice fails
+     *      This tests error handling
+     */
+    function test_RegisterMasterAgent_RevertIfAlreadyRegistered() public {
+        _registerMaster();
+        
+        bytes32 caps = registry.MASTER_DEFAULT_CAPS(); 
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AgentRegistry.AgentAlreadyRegistered.selector,
+                masterAgent
+            )
+        );
+        registry.registerMasterAgent(masterAgent, caps, "Duplicate");
     }
 }
