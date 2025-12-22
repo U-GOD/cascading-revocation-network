@@ -39,25 +39,36 @@ contract AgentRegistry {
     bytes32 public constant MASTER_DEFAULT_CAPS = 
         bytes32(uint256(1 << 0) | uint256(1 << 1)); // DELEGATE + REVOKE
 
-        error AgentAlreadyRegistered(address agent);
-        error InvalidAgentAddress();
-        error OnlyMasterCanRegisterChild();
-        error MasterNotRegistered(address master);
-        error AgentNotRegistered(address agent);
-        error NotAuthorizedToDeregister(address caller, address agent);
-        error AgentAlreadyDeactivated(address agent);
+    // CUSTOM ERRORS
+    error AgentAlreadyRegistered(address agent);
+    error InvalidAgentAddress();
+    error OnlyMasterCanRegisterChild();
+    error MasterNotRegistered(address master);
+    error AgentNotRegistered(address agent);
+    error NotAuthorizedToDeregister(address caller, address agent);
+    error AgentAlreadyDeactivated(address agent);
+    error AgentNotActive(address agent);
+    error NotAuthorizedToUpdate(address caller, address agent);
 
-        event AgentRegistered(
-            address indexed agent,
-            AgentType indexed agentType,
-            address indexed registeredBy,
-            bytes32 capabilties
-        );
+    // EVENTS
+    event AgentRegistered(
+        address indexed agent,
+        AgentType indexed agentType,
+        address indexed registeredBy,
+        bytes32 capabilties
+    );
 
-        event AgentDeregistered(
-            address indexed agent,
-            address indexed deregisteredBy
-        );
+    event AgentDeregistered(
+        address indexed agent,
+        address indexed deregisteredBy
+    );
+
+    event CapabilitiesUpdated (
+        address indexed agent,
+        bytes32 oldCapabilities,
+        bytes32 newCapabilities,
+        address indexed updatedBy
+    );
 
     /**
      * @notice Register a new master agent (called by users)
@@ -193,6 +204,39 @@ contract AgentRegistry {
                 emit AgentDeregistered(child, msg.sender);
             }
         }
+    }
+
+    /**
+     * @notice Update an agent's capabilities
+     * @param agent The agent to update
+     * @param newCapabilities The new capability flags
+     * @dev Can be called by:
+     *      - For MASTER: the user who registered it
+     *      - For CHILD: the master agent
+     */
+    function updateCapabilities(address agent, bytes32 newCapabilities) external {
+        if (!_isRegistered[agent]) revert AgentNotRegistered(agent);
+        if (!agents[agent].isActive) revert AgentNotActive(agent);
+
+        Agent storage agentData = agents[agent];
+        bool isAuthorized = false;
+
+        if (agentData.agentType == AgentType.MASTER) {
+            isAuthorized = (msg.sender == agentData.registeredBy);
+        } else if (agentData.agentType == AgentType.CHILD) {
+            address master = childToMaster[agent];
+            isAuthorized = (msg.sender == master);
+        }
+
+        if (!isAuthorized) {
+            revert NotAuthorizedToUpdate(msg.sender, agent);
+        }
+
+        bytes32 oldCapabilities = agentData.capabilities;
+
+        agentData.capabilities = newCapabilities;
+
+        emit CapabilitiesUpdated(agent, oldCapabilities, newCapabilities, msg.sender);
     }
 
     // QUERY FUNCTIONS
