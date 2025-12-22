@@ -42,7 +42,7 @@ contract AgentRegistryTest is Test {
         vm.prank(user); 
         registry.registerMasterAgent(
             masterAgent,
-            registry.MASTER_DEFAULT_CAPS(),
+            caps,
             "Test Master Agent"
         );
     }
@@ -132,5 +132,39 @@ contract AgentRegistryTest is Test {
             )
         );
         registry.registerChildAgent(childAgent1, childCaps, "Should Fail");
+    }
+
+    /**
+     * @dev Test that deregistering a master agent works (soft delete)
+     */
+    function test_DeregisterMasterAgent_Success() public {
+        _registerMaster();
+        assertTrue(registry.isActive(masterAgent), "Should be active initially");
+        
+        vm.prank(user);
+        registry.deregisterAgent(masterAgent);
+
+        assertTrue(registry.isRegistered(masterAgent), "Should still be registered");
+        assertFalse(registry.isActive(masterAgent), "Should NOT be active");
+
+        Agent memory agent = registry.getAgent(masterAgent);
+        assertFalse(agent.isActive, "isActive should be false");
+    }
+    
+    /**
+     * @dev Test that only authorized address can deregister
+     */
+    function test_DeregisterAgent_RevertIfUnauthorized() public {
+        _registerMaster();
+
+        vm.prank(stranger);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AgentRegistry.NotAuthorizedToDeregister.selector,
+                stranger,
+                masterAgent
+            )
+        );
+        registry.deregisterAgent(masterAgent);
     }
 }
