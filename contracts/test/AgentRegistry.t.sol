@@ -91,4 +91,46 @@ contract AgentRegistryTest is Test {
         );
         registry.registerMasterAgent(masterAgent, caps, "Duplicate");
     }
+
+    /**
+     * @dev Test that registering a child agent works correctly
+     */
+    function test_RegisterChildAgent_Success() public {
+        _registerMaster();
+        
+        bytes32 childCaps = registry.CAP_DAO_VOTE();
+        vm.prank(masterAgent);  // Child is registered BY the master
+        registry.registerChildAgent(childAgent1, childCaps, "DAO Voter Bot");
+        
+        assertTrue(registry.isRegistered(childAgent1), "Child should be registered");
+        assertEq(registry.getAgentCount(), 2, "Should have 2 agents (master + child)");
+        
+        // Check child data
+        Agent memory child = registry.getAgent(childAgent1);
+        assertEq(uint(child.agentType), uint(AgentType.CHILD), "Should be CHILD type");
+        assertEq(child.registeredBy, masterAgent, "RegisteredBy should be master");
+        
+        // Check parent-child relationship
+        assertEq(registry.getMaster(childAgent1), masterAgent, "Master should be set");
+        address[] memory children = registry.getChildren(masterAgent);
+        assertEq(children.length, 1, "Master should have 1 child");
+        assertEq(children[0], childAgent1, "Child address should match");
+    }
+    
+    /**
+     * @dev Test that only a registered master can register children
+     */
+    function test_RegisterChildAgent_RevertIfNotMaster() public {
+        // Try to register child without being a master
+        bytes32 childCaps = registry.CAP_DAO_VOTE();
+        
+        vm.prank(stranger);  
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AgentRegistry.MasterNotRegistered.selector,
+                stranger
+            )
+        );
+        registry.registerChildAgent(childAgent1, childCaps, "Should Fail");
+    }
 }
