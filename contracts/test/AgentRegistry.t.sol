@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
-
 import {AgentRegistry, Agent, AgentType} from "../src/AgentRegistry.sol";
 
 /**
@@ -166,5 +165,48 @@ contract AgentRegistryTest is Test {
             )
         );
         registry.deregisterAgent(masterAgent);
+    }
+
+    // ========================================================================
+    // TEST: deregisterAllChildren()
+    // ========================================================================
+    
+    /**
+     * @dev Test cascade revocation - deactivating ALL children at once
+     *      THIS IS THE CORE INNOVATION OF OUR PROJECT!
+     */
+    function test_DeregisterAllChildren_CascadeRevocation() public {
+        _registerMaster();
+        
+        bytes32 cap1 = registry.CAP_DAO_VOTE();
+        bytes32 cap2 = registry.CAP_NFT_BID();
+        bytes32 cap3 = registry.CAP_TREASURY();
+        
+        vm.startPrank(masterAgent); 
+        registry.registerChildAgent(childAgent1, cap1, "DAO Voter");
+        registry.registerChildAgent(childAgent2, cap2, "NFT Bidder");
+        registry.registerChildAgent(childAgent3, cap3, "Treasury Manager");
+        vm.stopPrank();
+        
+        assertTrue(registry.isActive(childAgent1), "Child1 should be active");
+        assertTrue(registry.isActive(childAgent2), "Child2 should be active");
+        assertTrue(registry.isActive(childAgent3), "Child3 should be active");
+        assertEq(registry.getAgentCount(), 4, "Should have 4 agents total");
+        
+        vm.prank(masterAgent);
+        registry.deregisterAllChildren(masterAgent);
+        
+        assertFalse(registry.isActive(childAgent1), "Child1 should be INACTIVE");
+        assertFalse(registry.isActive(childAgent2), "Child2 should be INACTIVE");
+        assertFalse(registry.isActive(childAgent3), "Child3 should be INACTIVE");
+        
+        assertTrue(registry.isActive(masterAgent), "Master should still be active");
+        
+        assertTrue(registry.isRegistered(childAgent1), "Child1 still registered");
+        assertTrue(registry.isRegistered(childAgent2), "Child2 still registered");
+        assertTrue(registry.isRegistered(childAgent3), "Child3 still registered");
+        
+        console.log("CASCADE REVOCATION SUCCESS!");
+        console.log("All 3 children deactivated in ONE transaction");
     }
 }
