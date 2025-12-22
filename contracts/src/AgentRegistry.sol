@@ -194,7 +194,38 @@ contract AgentRegistry {
             }
         }
     }
+
+    // QUERY FUNCTIONS
+    function getAgent(address agent) external view returns (Agent memory) {
+        return agents[agent];
+    }
+
+    function getCapabilities(address agent) external view returns (bytes32) {
+        return agents[agent].capabilities;
+    }
+
+    function hasCapability(address agent, bytes32 capability) external view returns (bool) {
+        return (agents[agent].capabilities & capability) != bytes32(0);
+    }
+
+    function getAllAgents() external view returns (address[] memory) {
+        return allAgents;
+    }
+
+    function getChildren(address master) external view returns (address[] memory) {
+        return masterToChildren[master];
+    }
+
+    function getMaster(address child) external view returns (address) {
+        return childToMaster[child];
+    }
+
+    function isActive(address agent) external view returns (bool) {
+        return _isRegistered[agent] && agents[agent].isActive;
+    }
     
+
+    // HELPER FUNCTIONS
     function isRegistered(address agent) public view returns (bool) {
         return _isRegistered[agent];
     }
