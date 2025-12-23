@@ -425,6 +425,36 @@ contract PermissionManager {
     }
 
     /**
+     * @notice Revoke a permission on behalf of an authorized caller
+     * @param permissionId The permission to revoke
+     * @param onBehalfOf The address that authorized this revocation
+     * @dev Used by RevocationController for batch operations
+     */
+    function revokeChildPermissionFor(
+        uint256 permissionId, 
+        address onBehalfOf
+    ) external {
+        if (permissions[permissionId].permissionId == 0) {
+            revert PermissionNotFound(permissionId);
+        }
+        
+        if (!permissions[permissionId].active) {
+            revert PermissionNotActive(permissionId);
+        }
+        
+        PermissionNode storage perm = permissions[permissionId];
+        address master = perm.grantedBy;
+        address owner = masterToOwner[master];
+        
+        if (onBehalfOf != master && onBehalfOf != owner) {
+            revert NotAuthorizedToRevoke(onBehalfOf, permissionId);
+        }
+        
+        perm.active = false;
+        emit PermissionRevoked(permissionId, onBehalfOf);
+    }
+
+    /**
      * @notice Execute an action as a child agent through permission validation
      * @param permissionId The permission that authorizes this action
      * @param data The calldata to send to the target (includes function selector)

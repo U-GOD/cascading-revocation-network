@@ -43,16 +43,17 @@ contract RevocationController {
             revert EmptyBatchRevocation();
         }
         
+        address caller = msg.sender;  
+        
         for (uint256 i = 0; i < permissionIds.length; i++) {
-            try permManager.revokeChildPermission(permissionIds[i]) {
+            try permManager.revokeChildPermissionFor(permissionIds[i], caller) {
                 revokedCount++;
             } catch {
-
+                
             }
         }
-
-        emit BatchRevocationExecuted(msg.sender, revokedCount, permissionIds);
         
+        emit BatchRevocationExecuted(caller, revokedCount, permissionIds);
         return revokedCount;
     }
 }
