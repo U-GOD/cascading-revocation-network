@@ -310,6 +310,35 @@ contract PermissionManager {
     }  
 
     /**
+     * @notice Revoke a single child permission
+     * @param permissionId The permission to revoke
+     * @dev Can be called by:
+     *      - The master who granted this permission
+     *      - The owner who set that master
+     */
+    function revokeChildPermission(uint256 permissionId) external {
+        if (permissions[permissionId].permissionId == 0) {
+            revert PermissionNotFound(permissionId);
+        }
+        
+        if (!permissions[permissionId].active) {
+            revert PermissionNotActive(permissionId);
+        }
+        
+        PermissionNode storage perm = permissions[permissionId];
+        address master = perm.grantedBy;
+        address owner = masterToOwner[master];
+        
+        if (msg.sender != master && msg.sender != owner) {
+            revert NotAuthorizedToRevoke(msg.sender, permissionId);
+        }
+        
+        perm.active = false;
+        
+        emit PermissionRevoked(permissionId, msg.sender);
+    }
+
+    /**
      * @dev Helper to get agent data from registry
      *      Returns tuple to avoid struct compatibility issues
      */
