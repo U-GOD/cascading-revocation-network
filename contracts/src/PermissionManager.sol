@@ -70,6 +70,15 @@ contract PermissionManager {
         address indexed masterAgent, 
         uint256 count
     );
+
+    event ChildActionExecuted(
+        uint256 indexed permissionId,
+        address indexed childAgent,
+        address indexed target,
+        bytes4 selector,
+        uint256 value,
+        bool success
+    );
     
     error MasterAlreadySet(address owner, address existingMaster);
     
@@ -92,6 +101,16 @@ contract PermissionManager {
     error AgentNotRegistered(address agent);
     
     error NotChildAgent(address agent);
+
+    error CallerNotChildAgent(address caller, address expectedChild);
+    
+    error SelectorNotAllowed(bytes4 selector, uint256 permissionId);
+    
+    error ValueExceedsLimit(uint256 sent, uint256 maxAllowed);
+    
+    error ExecutionFailed(bytes returnData);
+    
+    error CalldataTooShort();
     
     constructor(address _agentRegistry) {
         agentRegistry = AgentRegistry(_agentRegistry);
@@ -403,6 +422,77 @@ contract PermissionManager {
         masterToOwner[master] = address(0);
 
         emit MasterAgentRevoked(owner, master);
+    }
+
+    /**
+     * @notice Execute an action as a child agent through permission validation
+     * @param permissionId The permission that authorizes this action
+     * @param data The calldata to send to the target (includes function selector)
+     * @return success Whether the call succeeded
+     * @return returnData The data returned by the target
+     * @dev Child agents call this to execute actions they have permission for.
+     *      All validation happens here before forwarding to the target.
+     */
+    function executeAsChild(
+        uint256 permissionId,
+        bytes calldata data
+    ) external payable returns (bool success, bytes memory returnData) {
+        PermissionNode storage perm = permissions[permissionId];    
+
+        if (perm.permissionId == 0) {
+            revert PermissionNotFound(permissionId);
+        }
+        
+        if (!perm.active) {
+            revert PermissionNotActive(permissionId);
+        }
+        
+        if (block.timestamp > perm.expiry) {
+            revert PermissionExpired(permissionId, perm.expiry);
+        }
+        
+        if (msg.sender != perm.childAgent) {
+            revert CallerNotChildAgent(msg.sender, perm.childAgent);
+        }
+        
+        if (data.length < 4) {
+            revert CalldataTooShort();
+        }
+        
+        bytes4 selector = bytes4(data[:4]);
+        
+        bool selectorAllowed = false;
+        for (uint256 i = 0; i < perm.allowedSelectors.length; i++) {
+            if (perm.allowedSelectors[i] == selector) {
+                selectorAllowed = true;
+                break;
+            }
+        }
+        if (!selectorAllowed) {
+            revert SelectorNotAllowed(selector, permissionId);
+        }
+        
+        if (msg.value > perm.maxValue) {
+            revert ValueExceedsLimit(msg.value, perm.maxValue);
+        }
+        
+        // Forward call to target contract
+        (success, returnData) = perm.targetContract.call{value: msg.value}(data);
+        
+        emit ChildActionExecuted(
+            permissionId,
+            msg.sender,
+            perm.targetContract,
+            selector,
+            msg.value,
+            success
+        );
+        
+        if (!success) {
+            revert ExecutionFailed(returnData);
+        }
+        
+        return (success, returnData);
     }
 
     /**
