@@ -521,4 +521,68 @@ contract PermissionManagerTest is Test {
         
         assertEq(revokedCount, 1, "Should only revoke 1 (other already revoked)");
     }
+
+    // ========================================================================
+    // TESTS: revokeMasterAgent() - FULL CASCADE
+    // ========================================================================
+    
+    /**
+     * @dev Test full cascade: master + all children deactivated
+     */
+    function test_RevokeMasterAgent_FullCascade() public {
+        _fullSetup();
+        _registerChildInRegistry(childAgent2);
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId1 = permManager.grantChildPermission(
+            childAgent1, targetDAO, selectors, 0, _futureExpiry()
+        );
+        vm.prank(masterAgent);
+        uint256 permId2 = permManager.grantChildPermission(
+            childAgent2, targetDAO, selectors, 0, _futureExpiry()
+        );
+        
+        assertTrue(permManager.hasMasterAgent(user), "Master should be active");
+        
+        // FULL CASCADE REVOKE!
+        vm.prank(user);
+        permManager.revokeMasterAgent();
+        
+        assertFalse(permManager.hasMasterAgent(user), "Master should be inactive");
+        
+        assertFalse(permManager.isPermissionValid(permId1), "Perm1 should be invalid");
+        assertFalse(permManager.isPermissionValid(permId2), "Perm2 should be invalid");
+        
+        assertEq(permManager.masterToOwner(masterAgent), address(0), "Reverse lookup should be cleared");
+        
+        console.log("FULL CASCADE SUCCESS! Master + all children deactivated");
+    }
+    
+    /**
+     * @dev Test only owner can call revokeMasterAgent
+     */
+    function test_RevokeMasterAgent_OnlyOwnerCanCall() public {
+        _fullSetup();
+        
+        vm.prank(masterAgent);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.MasterNotSet.selector,
+                masterAgent  
+            )
+        );
+        permManager.revokeMasterAgent();
+        
+        vm.prank(stranger);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.MasterNotSet.selector,
+                stranger
+            )
+        );
+        permManager.revokeMasterAgent();
+    }
 }
