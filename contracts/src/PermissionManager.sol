@@ -41,6 +41,8 @@ contract PermissionManager {
     mapping(address => uint256[]) public permissionsByChild;
     
     mapping(address => uint256[]) public permissionsByMaster;
+
+    mapping(address => address) public masterToOwner;
   
     event MasterAgentSet(
         address indexed owner, 
@@ -204,9 +206,108 @@ contract PermissionManager {
         record.owner = owner;
         record.createdAt = block.timestamp;
         record.active = true;
+
+        masterToOwner[masterAgent] = owner;
         
         emit MasterAgentSet(owner, masterAgent);
-    }    
+    }  
+
+    /**
+     * @notice Grant a permission to a child agent
+     * @param child The child agent receiving the permission
+     * @param target The contract the child can interact with
+     * @param selectors The function selectors the child can call
+     * @param maxValue Maximum ETH the child can send per call (in wei)
+     * @param expiry Unix timestamp when permission expires
+     * @dev Only callable by a registered MASTER agent who has an owner.
+     */
+    function grantChildPermission(
+        address child,
+        address target,
+        bytes4[] calldata selectors,
+        uint256 maxValue,
+        uint256 expiry
+    ) external returns (uint256 permissionId) {
+        address master = msg.sender;
+
+        if (!agentRegistry.isRegistered(master)) {
+            revert AgentNotRegistered(master);
+        }
+        
+        (, AgentType masterType, , , bool masterActive, , ) = _getAgentData(master);
+        if (masterType != AgentType.MASTER) {
+            revert NotMasterAgent(master, address(0));
+        }
+        if (!masterActive) {
+            revert AgentNotRegistered(master);
+        }
+
+        // Get the owner who set this master
+        address owner = masterToOwner[master];
+        
+         if (owner == address(0)) {
+            revert NotMasterAgent(master, address(0));
+        }
+        
+        if (!agentRegistry.isRegistered(child)) {
+            revert AgentNotRegistered(child);
+        }
+        (, AgentType childType, , , bool childActive, , ) = _getAgentData(child);
+        if (childType != AgentType.CHILD) {
+            revert NotChildAgent(child);
+        }
+        if (!childActive) {
+            revert AgentNotRegistered(child);
+        }
+        
+        address childsMaster = agentRegistry.childToMaster(child);
+        if (childsMaster != master) {
+            revert NotChildAgent(child); 
+        }
+        
+        if (target == address(0)) {
+            revert InvalidTargetContract(target);
+        }
+        
+        if (selectors.length == 0) {
+            revert NoSelectorsProvided();
+        }
+        
+        if (expiry <= block.timestamp) {
+            revert PermissionExpired(0, expiry);
+        }
+        
+        // CREATE PERMISSION
+
+        // Get unique ID
+        permissionId = nextPermissionId;
+        nextPermissionId++;
+        
+        // Create PermissionNode
+        PermissionNode storage perm = permissions[permissionId];
+        perm.permissionId = permissionId;
+        perm.grantedBy = master;
+        perm.childAgent = child;
+        perm.targetContract = target;
+        perm.maxValue = maxValue;
+        perm.expiry = expiry;
+        perm.active = true;
+        perm.grantedAt = block.timestamp;
+        
+        // Copy selectors array (can't directly assign calldata to storage)
+        for (uint256 i = 0; i < selectors.length; i++) {
+            perm.allowedSelectors.push(selectors[i]);
+        }
+        
+        // UPDATE REVERSE LOOKUPS
+        permissionsByChild[child].push(permissionId);
+        
+        permissionsByMaster[master].push(permissionId);
+        
+        masterAgents[owner].childPermissionIds.push(permissionId);
+        
+        emit PermissionGranted(permissionId, master, child, target);
+    }  
 
     /**
      * @dev Helper to get agent data from registry
