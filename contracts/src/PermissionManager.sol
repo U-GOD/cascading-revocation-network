@@ -98,10 +98,6 @@ contract PermissionManager {
         nextPermissionId = 1; 
     }
 
-    // ========================================================================
-    // QUERY FUNCTIONS
-    // ========================================================================
-    
     function getMasterAgent(address owner) external view returns (MasterAgentRecord memory) {
         return masterAgents[owner];
     }
@@ -336,6 +332,42 @@ contract PermissionManager {
         perm.active = false;
         
         emit PermissionRevoked(permissionId, msg.sender);
+    }
+
+    /**
+     * @notice Revoke ALL permissions granted by a master agent
+     * @param master The master agent whose permissions to revoke
+     * @dev CASCADE REVOCATION
+     *      One call deactivates ALL child permissions!
+     * @return revokedCount The number of permissions revoked
+     */
+    function revokeAllChildren(address master) external returns (uint256 revokedCount) {
+        address owner = masterToOwner[master];
+        
+        if (owner == address(0)) {
+            revert NotMasterAgent(master, address(0));
+        }
+        
+        if (msg.sender != master && msg.sender != owner) {
+            revert NotAuthorizedToRevoke(msg.sender, 0);
+        }
+        
+        uint256[] storage permIds = permissionsByMaster[master];
+        
+        for (uint256 i = 0; i < permIds.length; i++) {
+            uint256 permId = permIds[i];
+            
+            if (permissions[permId].active) {
+                permissions[permId].active = false;
+                revokedCount++;
+                
+                emit PermissionRevoked(permId, msg.sender);
+            }
+        }
+        
+        emit AllPermissionsRevoked(master, revokedCount);
+        
+        return revokedCount;
     }
 
     /**
