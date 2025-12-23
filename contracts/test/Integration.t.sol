@@ -167,4 +167,128 @@ contract IntegrationTest is Test {
         console.log("User -> Master -> 3 Children -> Execute -> CASCADE REVOKE");
         console.log("All children revoked in ONE transaction!");
     }
+
+    /**
+     * @dev Test expired permission cannot execute
+     */
+    function test_EdgeCase_ExpiredPermissionFails() public {
+        console.log("\n=== EDGE CASE: Expired Permission ===");
+        
+        bytes32 masterCaps = registry.MASTER_DEFAULT_CAPS();
+        vm.prank(user);
+        registry.registerMasterAgent(masterAgent, masterCaps, "Master");
+        
+        vm.prank(user);
+        permManager.setMasterAgent(masterAgent);
+        
+        bytes32 childCaps = registry.CAP_DAO_VOTE();
+        vm.prank(masterAgent);
+        registry.registerChildAgent(childAgent1, childCaps, "Child1");
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        uint256 expiry = block.timestamp + 1 hours;
+        
+        vm.prank(masterAgent);
+        uint256 permId = permManager.grantChildPermission(
+            childAgent1, address(mockDAO), selectors, 0, expiry
+        );
+        
+        vm.warp(block.timestamp + 2 hours);
+        
+        bytes memory voteCalldata = abi.encodeWithSelector(VOTE_SELECTOR, uint256(99));
+        
+        vm.prank(childAgent1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.PermissionExpired.selector,
+                permId,
+                expiry
+            )
+        );
+        permManager.executeAsChild(permId, voteCalldata);
+        
+        console.log("  -> Expired permission correctly rejected");
+    }
+    
+    /**
+     * @dev Test unauthorized caller rejected
+     */
+    function test_EdgeCase_UnauthorizedCallerRejected() public {
+        console.log("\n=== EDGE CASE: Unauthorized Caller ===");
+        
+        bytes32 masterCaps = registry.MASTER_DEFAULT_CAPS();
+        vm.prank(user);
+        registry.registerMasterAgent(masterAgent, masterCaps, "Master");
+        
+        vm.prank(user);
+        permManager.setMasterAgent(masterAgent);
+        
+        bytes32 childCaps = registry.CAP_DAO_VOTE();
+        vm.prank(masterAgent);
+        registry.registerChildAgent(childAgent1, childCaps, "Child1");
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId = permManager.grantChildPermission(
+            childAgent1, address(mockDAO), selectors, 0, _futureExpiry()
+        );
+        
+        address attacker = makeAddr("attacker");
+        bytes memory voteCalldata = abi.encodeWithSelector(VOTE_SELECTOR, uint256(666));
+        
+        vm.prank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.CallerNotChildAgent.selector,
+                attacker,
+                childAgent1
+            )
+        );
+        permManager.executeAsChild(permId, voteCalldata);
+        
+        console.log("  -> Attacker correctly rejected");
+    }
+    
+    /**
+     * @dev Test double revocation handled gracefully
+     */
+    function test_EdgeCase_DoubleRevocationHandled() public {
+        console.log("\n=== EDGE CASE: Double Revocation ===");
+        
+        bytes32 masterCaps = registry.MASTER_DEFAULT_CAPS();
+        vm.prank(user);
+        registry.registerMasterAgent(masterAgent, masterCaps, "Master");
+        
+        vm.prank(user);
+        permManager.setMasterAgent(masterAgent);
+        
+        bytes32 childCaps = registry.CAP_DAO_VOTE();
+        vm.prank(masterAgent);
+        registry.registerChildAgent(childAgent1, childCaps, "Child1");
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId = permManager.grantChildPermission(
+            childAgent1, address(mockDAO), selectors, 0, _futureExpiry()
+        );
+        
+        vm.prank(masterAgent);
+        permManager.revokeChildPermission(permId);
+        
+        vm.prank(masterAgent);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.PermissionNotActive.selector,
+                permId
+            )
+        );
+        permManager.revokeChildPermission(permId);
+        
+        console.log("  -> Double revocation handled correctly");
+    }
 }
