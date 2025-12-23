@@ -6,6 +6,28 @@ import {AgentRegistry, Agent, AgentType} from "../src/AgentRegistry.sol";
 import {PermissionManager, PermissionNode, MasterAgentRecord} from "../src/PermissionManager.sol";
 
 /**
+ * @dev Simple mock DAO contract for testing executeAsChild
+ */
+contract MockDAO {
+    uint256 public lastVote;
+    uint256 public lastBid;
+    address public lastCaller;
+    
+    function vote(uint256 proposalId) external {
+        lastVote = proposalId;
+        lastCaller = msg.sender;
+    }
+    
+    function bid(uint256 amount) external payable {
+        lastBid = amount;
+        lastCaller = msg.sender;
+    }
+    
+    // Function to receive ETH
+    receive() external payable {}
+}
+
+/**
  * @title PermissionManagerTest
  * @notice Unit tests for PermissionManager grant logic
  */
@@ -23,6 +45,7 @@ contract PermissionManagerTest is Test {
     bytes4 public constant VOTE_SELECTOR = bytes4(keccak256("vote(uint256)"));
     bytes4 public constant BID_SELECTOR = bytes4(keccak256("bid(uint256)"));
     address public targetDAO;
+    MockDAO public mockDAO;
     
     function setUp() public {
         user = makeAddr("user");
@@ -36,6 +59,9 @@ contract PermissionManagerTest is Test {
         
         permManager = new PermissionManager(address(registry));
         
+        mockDAO = new MockDAO();
+        targetDAO = address(mockDAO);
+
         console.log("Setup complete");
         console.log("AgentRegistry:", address(registry));
         console.log("PermissionManager:", address(permManager));
@@ -85,6 +111,26 @@ contract PermissionManagerTest is Test {
         return 1;  
     }
     
+    /**
+     * @dev Full setup + grant permission, ready for execution tests
+     */
+    function _setupForExecution() internal returns (uint256 permissionId) {
+        _fullSetup();
+        
+        bytes4[] memory selectors = new bytes4[](2);
+        selectors[0] = VOTE_SELECTOR;
+        selectors[1] = BID_SELECTOR;
+        
+        vm.prank(masterAgent);
+        permissionId = permManager.grantChildPermission(
+            childAgent1,
+            targetDAO,
+            selectors,
+            1 ether,  
+            _futureExpiry()
+        );
+    }
+
     function test_SetUp_DeploysContracts() public view {
         assertTrue(address(registry) != address(0), "Registry should be deployed");
         assertTrue(address(permManager) != address(0), "PermManager should be deployed");
@@ -632,5 +678,29 @@ contract PermissionManagerTest is Test {
         console.log("Gas per child:", gasUsed / revokedCount);
         
         assertTrue(gasUsed < 1_000_000, "Gas should be under 1M");
+    }
+
+    // ========================================================================
+    // TESTS: executeAsChild()
+    // ========================================================================
+    
+    /**
+     * @dev Test child can successfully execute action through permission
+     */
+    function test_ExecuteAsChild_Success() public {
+        uint256 permId = _setupForExecution();
+        
+        bytes memory callData = abi.encodeWithSelector(VOTE_SELECTOR, uint256(42));
+        
+        vm.prank(childAgent1);
+        (bool success, ) = permManager.executeAsChild(permId, callData);
+        
+        assertTrue(success, "Execution should succeed");
+        
+        assertEq(mockDAO.lastVote(), 42, "DAO should have received vote");
+        
+        assertEq(mockDAO.lastCaller(), address(permManager), "Caller should be PermissionManager");
+        
+        console.log("executeAsChild SUCCESS! Child executed vote(42) through proxy");
     }
 }
