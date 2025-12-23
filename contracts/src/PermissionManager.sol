@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {AgentRegistry, AgentType} from "./AgentRegistry.sol";
+import {AgentRegistry, Agent, AgentType} from "./AgentRegistry.sol";
 
 /**
  * @title PermissionManager
@@ -162,5 +162,65 @@ contract PermissionManager {
         }
         
         return false;
+    }
+
+    /**
+     * @notice Set a master agent for the caller (user)
+     * @param masterAgent The address of the master agent
+     * @dev User calls this to delegate control to a master agent.
+     *      The master can then grant permissions to child agents.
+     */
+    function setMasterAgent(address masterAgent) external {
+        address owner = msg.sender;
+        
+        if (masterAgents[owner].active) {
+            revert MasterAlreadySet(owner, masterAgents[owner].masterAgent);
+        }
+
+        if (!agentRegistry.isRegistered(masterAgent)) {
+            revert AgentNotRegistered(masterAgent);
+        }
+        
+        (
+            address agentAddr,
+            AgentType agentType,
+            , 
+            , 
+            bool isActive,
+            ,  
+               
+        ) = _getAgentData(masterAgent);
+        
+        if (agentType != AgentType.MASTER) {
+            revert NotChildAgent(masterAgent); 
+        }
+        
+        if (!isActive) {
+            revert AgentNotRegistered(masterAgent); 
+        }
+        
+        MasterAgentRecord storage record = masterAgents[owner];
+        record.masterAgent = masterAgent;
+        record.owner = owner;
+        record.createdAt = block.timestamp;
+        record.active = true;
+        
+        emit MasterAgentSet(owner, masterAgent);
+    }    
+
+    /**
+     * @dev Helper to get agent data from registry
+     *      Returns tuple to avoid struct compatibility issues
+     */
+    function _getAgentData(address agent) internal view returns (
+        address agentAddress,
+        AgentType agentType,
+        bytes32 capabilities,
+        string memory metadata,
+        bool isActive,
+        uint256 registeredAt,
+        address registeredBy
+    ) {
+        return agentRegistry.agents(agent);
     }
 }
