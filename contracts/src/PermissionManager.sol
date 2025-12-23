@@ -238,7 +238,6 @@ contract PermissionManager {
             revert AgentNotRegistered(master);
         }
 
-        // Get the owner who set this master
         address owner = masterToOwner[master];
         
          if (owner == address(0)) {
@@ -368,6 +367,42 @@ contract PermissionManager {
         emit AllPermissionsRevoked(master, revokedCount);
         
         return revokedCount;
+    }
+
+    /**
+     * @notice Revoke master agent and CASCADE to all children
+     * @dev FULL CASCADE REVOCATION:
+     */
+    function revokeMasterAgent() external {
+        address owner = msg.sender;
+        
+        if (!masterAgents[owner].active) {
+            revert MasterNotSet(owner);
+        }
+        
+        address master = masterAgents[owner].masterAgent;
+        
+        uint256[] storage permIds = permissionsByMaster[master];
+        uint256 revokedCount = 0;
+        
+        for (uint256 i = 0; i < permIds.length; i++) {
+            uint256 permId = permIds[i];
+            if (permissions[permId].active) {
+                permissions[permId].active = false;
+                revokedCount++;
+                emit PermissionRevoked(permId, owner);
+            }
+        }
+        
+        if (revokedCount > 0) {
+            emit AllPermissionsRevoked(master, revokedCount);
+        }
+        
+        masterAgents[owner].active = false;
+        
+        masterToOwner[master] = address(0);
+
+        emit MasterAgentRevoked(owner, master);
     }
 
     /**
