@@ -291,4 +291,106 @@ contract IntegrationTest is Test {
         
         console.log("  -> Double revocation handled correctly");
     }
+   
+    /**
+     * @dev Comprehensive gas profiling for all major operations
+     */
+    function test_GasProfile_AllOperations() public {
+        console.log("\n");
+        console.log("=========================================");
+        console.log("       GAS PROFILING REPORT");
+        console.log("=========================================");
+        console.log("");
+        
+        uint256 gasStart;
+        uint256 gasUsed;
+        
+        bytes32 masterCaps = registry.MASTER_DEFAULT_CAPS();
+        
+        gasStart = gasleft();
+        vm.prank(user);
+        registry.registerMasterAgent(masterAgent, masterCaps, "Master Bot");
+        gasUsed = gasStart - gasleft();
+        
+        console.log("1. Register Master Agent:    ", gasUsed, "gas");
+        
+        gasStart = gasleft();
+        vm.prank(user);
+        permManager.setMasterAgent(masterAgent);
+        gasUsed = gasStart - gasleft();
+        
+        console.log("2. Set Master Agent:         ", gasUsed, "gas");
+        
+        bytes32 childCaps = registry.CAP_DAO_VOTE();
+        
+        gasStart = gasleft();
+        vm.prank(masterAgent);
+        registry.registerChildAgent(childAgent1, childCaps, "Child1");
+        gasUsed = gasStart - gasleft();
+        
+        console.log("3. Register Child Agent:     ", gasUsed, "gas");
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        gasStart = gasleft();
+        vm.prank(masterAgent);
+        uint256 permId = permManager.grantChildPermission(
+            childAgent1, address(mockDAO), selectors, 0, _futureExpiry()
+        );
+        gasUsed = gasStart - gasleft();
+        
+        console.log("4. Grant Permission:         ", gasUsed, "gas");
+        
+        bytes memory voteCalldata = abi.encodeWithSelector(VOTE_SELECTOR, uint256(42));
+        
+        gasStart = gasleft();
+        vm.prank(childAgent1);
+        permManager.executeAsChild(permId, voteCalldata);
+        gasUsed = gasStart - gasleft();
+        
+        console.log("5. Execute as Child:         ", gasUsed, "gas");
+        
+        vm.prank(masterAgent);
+        registry.registerChildAgent(childAgent2, childCaps, "Child2");
+        vm.prank(masterAgent);
+        uint256 permId2 = permManager.grantChildPermission(
+            childAgent2, address(mockDAO), selectors, 0, _futureExpiry()
+        );
+        
+        gasStart = gasleft();
+        vm.prank(masterAgent);
+        permManager.revokeChildPermission(permId2);
+        gasUsed = gasStart - gasleft();
+        
+        console.log("6. Revoke Single Permission: ", gasUsed, "gas");
+        
+        for (uint256 i = 0; i < 10; i++) {
+            address child = makeAddr(string(abi.encodePacked("batchChild", i)));
+            vm.prank(masterAgent);
+            registry.registerChildAgent(child, childCaps, "BatchChild");
+            vm.prank(masterAgent);
+            permManager.grantChildPermission(
+                child, address(mockDAO), selectors, 0, _futureExpiry()
+            );
+        }
+        
+        uint256[] memory allPerms = permManager.getPermissionsByMaster(masterAgent);
+        console.log("");
+        console.log("   Active permissions before cascade:", allPerms.length);
+        
+        gasStart = gasleft();
+        vm.prank(masterAgent);
+        uint256 revokedCount = permManager.revokeAllChildren(masterAgent);
+        gasUsed = gasStart - gasleft();
+        
+        console.log("7. Cascade Revoke count:     ", revokedCount);
+        console.log("   Cascade Revoke gas:       ", gasUsed, "gas");
+        console.log("   Gas per child:            ", gasUsed / revokedCount, "gas");
+        
+        console.log("");
+        console.log("=========================================");
+        console.log("       END GAS REPORT");
+        console.log("=========================================");
+    }
 }
