@@ -28,7 +28,36 @@ After Cascade Revocation: revokeAllChildren() = 1 transaction = ~2,949 gas per c
 ---
 
 ## Architecture
-USER (EOA) → setMasterAgent() → MASTER AGENT │ grantChildPermission() (multiple) │ │ │ ▼ ▼ ▼ CHILD #1 CHILD #2 CHILD #3 │ │ │ └───────────┼───────────┘ │ executeAsChild() → Target Contracts │ CASCADE REVOKE (ONE CALL = ALL)
+                              ┌──────────┐
+                              │   USER   │
+                              └────┬─────┘
+                                   │ setMasterAgent()
+                                   ▼
+                            ┌──────────────┐
+                            │ MASTER AGENT │
+                            └──────┬───────┘
+                                   │ grantChildPermission()
+                 ┌─────────────────┼─────────────────┐
+                 │                 │                 │
+                 ▼                 ▼                 ▼
+           ┌─────────┐       ┌─────────┐       ┌─────────┐
+           │ Child 1 │       │ Child 2 │       │ Child 3 │
+           └────┬────┘       └────┬────┘       └────┬────┘
+                │                 │                 │
+                └────────────┬────┴────┬────────────┘
+                             │         │
+                             ▼         ▼
+                    ┌────────────────────────┐
+                    │    TARGET CONTRACTS    │
+                    │  (via executeAsChild)  │
+                    └────────────────────────┘
+
+         ════════════════════════════════════════════
+                        CASCADE REVOKE 
+                     revokeAllChildren(master)
+                              ═══
+                    ALL CHILDREN REVOKED AT ONCE
+         ════════════════════════════════════════════
 
 ---
 
