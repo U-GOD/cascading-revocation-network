@@ -585,4 +585,52 @@ contract PermissionManagerTest is Test {
         );
         permManager.revokeMasterAgent();
     }
+
+    // ========================================================================
+    // GAS TEST: Cascade with many children
+    // ========================================================================
+    
+    /**
+     * @dev Test cascade revocation with 10 children to verify gas limits
+     */
+    function test_GasTest_CascadeWith10Children() public {
+        _registerMasterInRegistry();
+        
+        vm.prank(user);
+        permManager.setMasterAgent(masterAgent);
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        for (uint256 i = 0; i < 10; i++) {
+            address child = makeAddr(string(abi.encodePacked("child", i)));
+            
+            bytes32 caps = registry.CAP_DAO_VOTE();
+            vm.prank(masterAgent);
+            registry.registerChildAgent(child, caps, "Test Child");
+            
+            vm.prank(masterAgent);
+            permManager.grantChildPermission(
+                child, targetDAO, selectors, 0, _futureExpiry()
+            );
+        }
+        
+        uint256[] memory masterPerms = permManager.getPermissionsByMaster(masterAgent);
+        assertEq(masterPerms.length, 10, "Should have 10 permissions");
+        
+        // CASCADE REVOKE ALL 10!
+        vm.prank(masterAgent);
+        uint256 gasStart = gasleft();
+        uint256 revokedCount = permManager.revokeAllChildren(masterAgent);
+        uint256 gasUsed = gasStart - gasleft();
+
+        assertEq(revokedCount, 10, "Should revoke 10 permissions");
+        
+        console.log("=== GAS REPORT ===");
+        console.log("Children revoked:", revokedCount);
+        console.log("Gas used:", gasUsed);
+        console.log("Gas per child:", gasUsed / revokedCount);
+        
+        assertTrue(gasUsed < 1_000_000, "Gas should be under 1M");
+    }
 }
