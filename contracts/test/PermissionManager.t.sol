@@ -453,4 +453,72 @@ contract PermissionManagerTest is Test {
         );
         permManager.revokeChildPermission(permId);
     }
+
+    // ========================================================================
+    // TESTS: revokeAllChildren() - CASCADE REVOCATION 
+    // ========================================================================
+    
+    /**
+     * @dev Test cascade revokes all permissions at once
+     */
+    function test_RevokeAllChildren_CascadeSuccess() public {
+        _fullSetup();
+        
+        _registerChildInRegistry(childAgent2);
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId1 = permManager.grantChildPermission(
+            childAgent1, targetDAO, selectors, 0, _futureExpiry()
+        );
+        
+        vm.prank(masterAgent);
+        uint256 permId2 = permManager.grantChildPermission(
+            childAgent2, targetDAO, selectors, 0, _futureExpiry()
+        );
+        
+        assertTrue(permManager.isPermissionValid(permId1), "Perm1 should be valid");
+        assertTrue(permManager.isPermissionValid(permId2), "Perm2 should be valid");
+        
+        // CASCADE REVOKE! 
+        vm.prank(masterAgent);
+        uint256 revokedCount = permManager.revokeAllChildren(masterAgent);
+        
+        assertEq(revokedCount, 2, "Should revoke 2 permissions");
+        
+        assertFalse(permManager.isPermissionValid(permId1), "Perm1 should be invalid");
+        assertFalse(permManager.isPermissionValid(permId2), "Perm2 should be invalid");
+        
+        console.log("CASCADE REVOCATION SUCCESS! Revoked:", revokedCount);
+    }
+    
+    /**
+     * @dev Test cascade returns correct count (skips already revoked)
+     */
+    function test_RevokeAllChildren_SkipsAlreadyRevoked() public {
+        _fullSetup();
+        _registerChildInRegistry(childAgent2);
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId1 = permManager.grantChildPermission(
+            childAgent1, targetDAO, selectors, 0, _futureExpiry()
+        );
+        vm.prank(masterAgent);
+        permManager.grantChildPermission(
+            childAgent2, targetDAO, selectors, 0, _futureExpiry()
+        );
+        
+        vm.prank(masterAgent);
+        permManager.revokeChildPermission(permId1);
+        
+        vm.prank(masterAgent);
+        uint256 revokedCount = permManager.revokeAllChildren(masterAgent);
+        
+        assertEq(revokedCount, 1, "Should only revoke 1 (other already revoked)");
+    }
 }
