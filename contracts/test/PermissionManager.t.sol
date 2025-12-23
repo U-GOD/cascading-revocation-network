@@ -703,4 +703,82 @@ contract PermissionManagerTest is Test {
         
         console.log("executeAsChild SUCCESS! Child executed vote(42) through proxy");
     }
+
+    /**
+     * @dev Test wrong caller can't execute
+     */
+    function test_ExecuteAsChild_RevertIfWrongCaller() public {
+        uint256 permId = _setupForExecution();
+        bytes memory callData = abi.encodeWithSelector(VOTE_SELECTOR, uint256(42));
+        
+        vm.prank(stranger);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.CallerNotChildAgent.selector,
+                stranger,
+                childAgent1
+            )
+        );
+        permManager.executeAsChild(permId, callData);
+    }
+    
+    /**
+     * @dev Test revoked permission can't execute
+     */
+    function test_ExecuteAsChild_RevertIfRevoked() public {
+        uint256 permId = _setupForExecution();
+        bytes memory callData = abi.encodeWithSelector(VOTE_SELECTOR, uint256(42));
+        
+        vm.prank(masterAgent);
+        permManager.revokeChildPermission(permId);
+        
+        vm.prank(childAgent1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.PermissionNotActive.selector,
+                permId
+            )
+        );
+        permManager.executeAsChild(permId, callData);
+    }
+    
+    /**
+     * @dev Test wrong selector rejected
+     */
+    function test_ExecuteAsChild_RevertIfWrongSelector() public {
+        uint256 permId = _setupForExecution();
+        
+        bytes4 wrongSelector = bytes4(keccak256("withdraw(uint256)"));
+        bytes memory callData = abi.encodeWithSelector(wrongSelector, uint256(100));
+        
+        vm.prank(childAgent1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.SelectorNotAllowed.selector,
+                wrongSelector,
+                permId
+            )
+        );
+        permManager.executeAsChild(permId, callData);
+    }
+    
+    /**
+     * @dev Test value exceeding maxValue rejected
+     */
+    function test_ExecuteAsChild_RevertIfValueExceeds() public {
+        uint256 permId = _setupForExecution();  
+        bytes memory callData = abi.encodeWithSelector(BID_SELECTOR, uint256(100));
+        
+        vm.deal(childAgent1, 10 ether);
+        
+        vm.prank(childAgent1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.ValueExceedsLimit.selector,
+                2 ether,
+                1 ether
+            )
+        );
+        permManager.executeAsChild{value: 2 ether}(permId, callData);
+    }
 }
