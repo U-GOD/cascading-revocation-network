@@ -324,4 +324,62 @@ contract PermissionManager {
     ) {
         return agentRegistry.agents(agent);
     }
+
+    /**
+     * @dev Check if caller is a registered and active MASTER agent
+     * @return True if caller is valid master
+     */
+    function _isValidMaster(address account) internal view returns (bool) {
+        if (!agentRegistry.isRegistered(account)) return false;
+        
+        (, AgentType agentType, , , bool isActive, , ) = _getAgentData(account);
+        
+        return agentType == AgentType.MASTER && isActive;
+    }
+    
+    /**
+     * @dev Check if a child agent belongs to a specific master
+     * @param child The child agent address
+     * @param master The master agent address
+     * @return True if child belongs to master
+     */
+    function _isChildOfMaster(address child, address master) internal view returns (bool) {
+        return agentRegistry.childToMaster(child) == master;
+    }
+    
+    /**
+     * @dev Get the owner address for a master agent
+     * @param master The master agent address
+     * @return The owner address (address(0) if not set)
+     */
+    function _getOwnerForMaster(address master) internal view returns (address) {
+        return masterToOwner[master];
+    }
+    
+    /**
+     * @dev Validate that a permission exists and is active
+     * @param permissionId The permission ID to check
+     */
+    function _requireValidPermission(uint256 permissionId) internal view {
+        if (permissions[permissionId].permissionId == 0) {
+            revert PermissionNotFound(permissionId);
+        }
+        if (!permissions[permissionId].active) {
+            revert PermissionNotActive(permissionId);
+        }
+    }
+    
+    /**
+     * @dev Check if caller is authorized to manage a permission
+     *      Authorized: the master who granted it, or the owner
+     * @param permissionId The permission ID
+     * @return True if caller can manage this permission
+     */
+    function _canManagePermission(uint256 permissionId) internal view returns (bool) {
+        PermissionNode storage perm = permissions[permissionId];
+        address master = perm.grantedBy;
+        address owner = masterToOwner[master];
+        
+        return msg.sender == master || msg.sender == owner;
+    }
 }
