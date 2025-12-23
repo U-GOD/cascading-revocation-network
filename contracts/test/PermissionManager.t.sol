@@ -370,4 +370,87 @@ contract PermissionManagerTest is Test {
 
         assertFalse(permManager.isPermissionValid(permId), "Should be invalid after expiry");
     }
+
+    // ========================================================================
+    // TESTS: revokeChildPermission()
+    // ========================================================================
+    
+    /**
+     * @dev Test master can revoke permission they granted
+     */
+    function test_RevokeChildPermission_Success() public {
+        _fullSetup();
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId = permManager.grantChildPermission(
+            childAgent1,
+            targetDAO,
+            selectors,
+            0,
+            _futureExpiry()
+        );
+        
+        assertTrue(permManager.isPermissionValid(permId), "Should be valid before");
+        
+        vm.prank(masterAgent);
+        permManager.revokeChildPermission(permId);
+        
+        assertFalse(permManager.isPermissionValid(permId), "Should be invalid after");
+    }
+    
+    /**
+     * @dev Test owner can also revoke (not just master)
+     */
+    function test_RevokeChildPermission_OwnerCanRevoke() public {
+        _fullSetup();
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId = permManager.grantChildPermission(
+            childAgent1,
+            targetDAO,
+            selectors,
+            0,
+            _futureExpiry()
+        );
+        
+        vm.prank(user);
+        permManager.revokeChildPermission(permId);
+        
+        assertFalse(permManager.isPermissionValid(permId), "Should be invalid after");
+    }
+    
+    /**
+     * @dev Test unauthorized can't revoke
+     */
+    function test_RevokeChildPermission_RevertIfUnauthorized() public {
+        _fullSetup();
+        
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = VOTE_SELECTOR;
+        
+        vm.prank(masterAgent);
+        uint256 permId = permManager.grantChildPermission(
+            childAgent1,
+            targetDAO,
+            selectors,
+            0,
+            _futureExpiry()
+        );
+        
+        vm.prank(stranger);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PermissionManager.NotAuthorizedToRevoke.selector,
+                stranger,
+                permId
+            )
+        );
+        permManager.revokeChildPermission(permId);
+    }
 }
