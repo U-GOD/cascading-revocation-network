@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: envio-indexer
+networks:
+- id: 84532
+  start_block: 0
+  contracts:
+  - name: PermissionManager
+    address:
+    - 0x44A16826fd7ED732236f953B42Ecb66D27b5aF1D
+    handler: src/EventHandlers.ts
+    events:
+    - event: AllPermissionsRevoked(address indexed masterAgent, uint256 count)
+    - event: ChildActionExecuted(uint256 indexed permissionId, address indexed childAgent, address indexed target, bytes4 selector, uint256 value, bool success)
+    - event: MasterAgentRevoked(address indexed owner, address indexed masterAgent)
+    - event: MasterAgentSet(address indexed owner, address indexed masterAgent)
+    - event: PermissionGranted(uint256 indexed permissionId, address indexed masterAgent, address indexed childAgent, address targetContract)
+    - event: PermissionRevoked(uint256 indexed permissionId, address indexed revokedBy)
+  - name: AgentRegistry
+    address:
+    - 0x7Ce8905a69DaCD666BB673B5A07dE49Dd3078797
+    handler: src/EventHandlers.ts
+    events:
+    - event: AgentDeregistered(address indexed agent, address indexed deregisteredBy)
+    - event: AgentRegistered(address indexed agent, uint8 indexed agentType, address indexed registeredBy, bytes32 capabilties)
+    - event: CapabilitiesUpdated(address indexed agent, bytes32 oldCapabilities, bytes32 newCapabilities, address indexed updatedBy)
+unordered_multichain_mode: true
+preload_handlers: true

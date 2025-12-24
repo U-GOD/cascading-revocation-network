@@ -1,0 +1,64 @@
+type AgentRegistry_AgentDeregistered {
+  id: ID!
+  agent: String!
+  deregisteredBy: String!
+}
+
+type AgentRegistry_AgentRegistered {
+  id: ID!
+  agent: String!
+  agentType: BigInt!
+  registeredBy: String!
+  capabilties: String!
+}
+
+type AgentRegistry_CapabilitiesUpdated {
+  id: ID!
+  agent: String!
+  oldCapabilities: String!
+  newCapabilities: String!
+  updatedBy: String!
+}
+
+type PermissionManager_AllPermissionsRevoked {
+  id: ID!
+  masterAgent: String!
+  count: BigInt!
+}
+
+type PermissionManager_ChildActionExecuted {
+  id: ID!
+  permissionId: BigInt!
+  childAgent: String!
+  target: String!
+  selector: String!
+  value: BigInt!
+  success: Boolean!
+}
+
+type PermissionManager_MasterAgentRevoked {
+  id: ID!
+  owner: String!
+  masterAgent: String!
+}
+
+type PermissionManager_MasterAgentSet {
+  id: ID!
+  owner: String!
+  masterAgent: String!
+}
+
+type PermissionManager_PermissionGranted {
+  id: ID!
+  permissionId: BigInt!
+  masterAgent: String!
+  childAgent: String!
+  targetContract: String!
+}
+
+type PermissionManager_PermissionRevoked {
+  id: ID!
+  permissionId: BigInt!
+  revokedBy: String!
+}
+
